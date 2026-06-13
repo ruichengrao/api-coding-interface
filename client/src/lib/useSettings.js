@@ -153,18 +153,30 @@ function load() {
 export function useStore() {
   const [store, setStore] = useState(load);
 
-  // Debounced persistence so rapid streaming updates don't thrash localStorage.
+  // Persist during idle time so large conversations don't block rendering while
+  // the agent is streaming tool/message updates.
   const timer = useRef(null);
   useEffect(() => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
+    let idleId = null;
+    const persist = () => {
       try {
         localStorage.setItem(KEY, JSON.stringify(store));
       } catch {
         /* quota exceeded — keep running with in-memory state */
       }
-    }, 200);
-    return () => clearTimeout(timer.current);
+    };
+    timer.current = setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(persist, { timeout: 2500 });
+      } else {
+        persist();
+      }
+    }, 1200);
+    return () => {
+      clearTimeout(timer.current);
+      if (idleId != null && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
+    };
   }, [store]);
 
   // ── API key pool ──────────────────────────────────────────────────────────

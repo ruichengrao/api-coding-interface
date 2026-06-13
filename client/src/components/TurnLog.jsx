@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ScrollText,
   Copy,
@@ -10,6 +10,9 @@ import {
   Building2,
   Mail,
 } from "lucide-react";
+
+const INITIAL_VISIBLE_TURNS = 80;
+const TURN_PAGE_SIZE = 80;
 
 function CopyBtn({ value }) {
   const [copied, setCopied] = useState(false);
@@ -102,6 +105,13 @@ function SafetyIdentifierCard({ enabled, value }) {
 }
 
 export default function TurnLog({ width, turns, apiIdentity, safetyIdentifierEnabled, safetyIdentifier, onExport }) {
+  const [visibleTurnCount, setVisibleTurnCount] = useState(INITIAL_VISIBLE_TURNS);
+  const visibleTurns = useMemo(
+    () => turns.slice(Math.max(0, turns.length - visibleTurnCount)),
+    [turns, visibleTurnCount]
+  );
+  const hiddenTurnCount = turns.length - visibleTurns.length;
+
   return (
     <aside
       style={{ width }}
@@ -130,13 +140,23 @@ export default function TurnLog({ width, turns, apiIdentity, safetyIdentifierEna
           </p>
         )}
 
-        {turns.map((turn, i) => {
+        {hiddenTurnCount > 0 && (
+          <button
+            onClick={() => setVisibleTurnCount((count) => count + TURN_PAGE_SIZE)}
+            className="flex w-full items-center justify-center rounded-lg border border-white/10 px-2 py-1.5 text-xs text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          >
+            Show {Math.min(TURN_PAGE_SIZE, hiddenTurnCount)} older turns
+          </button>
+        )}
+
+        {visibleTurns.map((turn, i) => {
           const identity = turn.apiIdentity || apiIdentity || {};
           const calls = Array.isArray(turn.calls) ? turn.calls : [];
+          const turnNumber = hiddenTurnCount + i + 1;
           return (
             <div key={turn.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs">
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-semibold text-zinc-300">Turn {i + 1}</span>
+                <span className="font-semibold text-zinc-300">Turn {turnNumber}</span>
                 <span className="text-zinc-500">{turn.time}</span>
               </div>
 

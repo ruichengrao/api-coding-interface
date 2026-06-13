@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useLayoutEffect } from "react";
+import { memo, useCallback, useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
 import {
   SendHorizontal,
   Plus,
@@ -139,6 +139,8 @@ const PANEL_DEFAULT = 320;
 const PANEL_MIN = 220;
 const PANEL_MAX = 560;
 const COMPOSER_MAX_HEIGHT = 160;
+const INITIAL_VISIBLE_MESSAGES = 140;
+const MESSAGE_PAGE_SIZE = 100;
 
 const loadWidth = (key) => {
   const v = Number(localStorage.getItem(`cla.panel.${key}`));
@@ -181,6 +183,63 @@ function ResizeHandle({ width, setWidth, dir }) {
   );
 }
 
+const MessageRow = memo(function MessageRow({ message, onApprove, onReject }) {
+  if (message.type === "notice") {
+    return (
+      <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-400">
+        {message.text}
+      </div>
+    );
+  }
+
+  if (message.type === "tool") {
+    return (
+      <div className="ml-9">
+        <ToolCard tool={message} onApprove={onApprove} onReject={onReject} />
+      </div>
+    );
+  }
+
+  const isUser = message.role === "user";
+  return (
+    <div className="flex gap-3">
+      <div
+        className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg ${
+          isUser ? "bg-zinc-700" : "bg-gradient-to-br from-sky-500 to-indigo-600"
+        }`}
+      >
+        {isUser ? <User size={15} /> : <Bot size={15} className="text-white" />}
+      </div>
+      <div className="min-w-0 flex-1 pt-0.5">
+        {isUser ? (
+          <>
+            {message.text && (
+              <p className="whitespace-pre-wrap text-[0.92rem] leading-relaxed text-zinc-200">
+                {message.text}
+              </p>
+            )}
+            {message.attachments?.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {message.attachments.map((a, i) => (
+                  <span
+                    key={i}
+                    className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-zinc-400"
+                  >
+                    {a.kind === "image" ? <ImageIcon size={11} /> : <FileText size={11} />}
+                    {a.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <Markdown>{message.text}</Markdown>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export default function App() {
   const {
     apiKeys,
@@ -199,12 +258,18 @@ export default function App() {
   } = useStore();
 
   const [showNewChat, setShowNewChat] = useState(false);
+  const [visibleMessageCount, setVisibleMessageCount] = useState(INITIAL_VISIBLE_MESSAGES);
 
   // The active chat is the single source of truth for the conversation, its
   // turn log, and its settings.
   const chat = activeChat;
   const messages = chat?.messages || [];
   const turns = chat?.turns || [];
+  const visibleMessages = useMemo(
+    () => messages.slice(Math.max(0, messages.length - visibleMessageCount)),
+    [messages, visibleMessageCount]
+  );
+  const hiddenMessageCount = messages.length - visibleMessages.length;
 
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -222,10 +287,20 @@ export default function App() {
   const scrollRef = useRef(null);
   const abortRef = useRef(null);
   const identityCheckRef = useRef(new Set());
+  const stickToBottomRef = useRef(true);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const scroller = scrollRef.current;
+    if (!scroller || !stickToBottomRef.current) return;
+    requestAnimationFrame(() => {
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "auto" });
+    });
   }, [messages, status]);
+
+  const onChatScroll = useCallback((e) => {
+    const el = e.currentTarget;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
+  }, []);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -249,6 +324,7 @@ export default function App() {
     setError(null);
     setStatus("");
     setAttachments([]);
+    setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
   }, [activeChatId]);
 
   // Pre-fill the workspace folder from the server default for the first chat.
@@ -291,12 +367,12 @@ export default function App() {
     updateChat,
   ]);
 
-  const patchTool = (chatId, callId, patch) =>
+  const patchTool = useCallback((chatId, callId, patch) =>
     updateChat(chatId, (c) => ({
       messages: c.messages.map((m) =>
         m.type === "tool" && m.call_id === callId ? { ...m, ...patch } : m
       ),
-    }));
+    })), [updateChat]);
 
   const addFiles = async (files) => {
     const added = [];
@@ -387,6 +463,7 @@ export default function App() {
     const turnId = nextId("turn");
     const userMessageId = nextId("msg");
 
+    stickToBottomRef.current = true;
     setInput("");
     setAttachments([]);
     setStatus("Thinking…");
@@ -548,14 +625,14 @@ export default function App() {
     setStatus("");
   };
 
-  const handleApprove = async (callId) => {
+  const handleApprove = useCallback(async (callId) => {
     patchTool(streamChatId.current, callId, { status: "running" });
     setStatus("Thinking…");
     await approveToolCall(callId, true);
-  };
-  const handleReject = async (callId) => {
+  }, [patchTool]);
+  const handleReject = useCallback(async (callId) => {
     await approveToolCall(callId, false);
-  };
+  }, []);
 
   const onKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -684,7 +761,7 @@ export default function App() {
           </button>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6">
+        <div ref={scrollRef} onScroll={onChatScroll} className="flex-1 overflow-y-auto px-5 py-6">
           <div className="mx-auto max-w-3xl space-y-5">
             {!chat && (
               <div className="mt-20 text-center text-zinc-500">
@@ -709,63 +786,23 @@ export default function App() {
               </div>
             )}
 
-            {messages.map((m) => {
-              if (m.type === "notice") {
-                return (
-                  <div
-                    key={m.id}
-                    className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-400"
-                  >
-                    {m.text}
-                  </div>
-                );
-              }
-              if (m.type === "tool") {
-                return (
-                  <div key={m.id} className="ml-9">
-                    <ToolCard tool={m} onApprove={handleApprove} onReject={handleReject} />
-                  </div>
-                );
-              }
-              const isUser = m.role === "user";
-              return (
-                <div key={m.id} className="flex gap-3">
-                  <div
-                    className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg ${
-                      isUser ? "bg-zinc-700" : "bg-gradient-to-br from-sky-500 to-indigo-600"
-                    }`}
-                  >
-                    {isUser ? <User size={15} /> : <Bot size={15} className="text-white" />}
-                  </div>
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    {isUser ? (
-                      <>
-                        {m.text && (
-                          <p className="whitespace-pre-wrap text-[0.92rem] leading-relaxed text-zinc-200">
-                            {m.text}
-                          </p>
-                        )}
-                        {m.attachments?.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {m.attachments.map((a, i) => (
-                              <span
-                                key={i}
-                                className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-zinc-400"
-                              >
-                                {a.kind === "image" ? <ImageIcon size={11} /> : <FileText size={11} />}
-                                {a.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <Markdown>{m.text}</Markdown>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {hiddenMessageCount > 0 && (
+              <button
+                onClick={() => setVisibleMessageCount((count) => count + MESSAGE_PAGE_SIZE)}
+                className="mx-auto flex items-center justify-center rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+              >
+                Show {Math.min(MESSAGE_PAGE_SIZE, hiddenMessageCount)} older messages
+              </button>
+            )}
+
+            {visibleMessages.map((m) => (
+              <MessageRow
+                key={m.id}
+                message={m}
+                onApprove={handleApprove}
+                onReject={handleReject}
+              />
+            ))}
 
             {status && (
               <div className="ml-10 flex items-center gap-2 text-sm text-zinc-500">
