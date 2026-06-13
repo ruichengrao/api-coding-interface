@@ -47,8 +47,7 @@ function makeChat(seed = {}) {
 }
 
 function freshStore() {
-  const chat = makeChat();
-  return { version: 2, apiKeys: [], chats: [chat], activeChatId: chat.id, defaults: { ...SETTING_DEFAULTS } };
+  return { version: 2, apiKeys: [], chats: [], activeChatId: null, defaults: { ...SETTING_DEFAULTS } };
 }
 
 function makePersistedId(prefix) {
@@ -117,13 +116,9 @@ function migrateV1(old) {
 function normalize(store) {
   if (!Array.isArray(store.apiKeys)) store.apiKeys = [];
   store.defaults = { ...SETTING_DEFAULTS, ...(store.defaults || {}) };
-  if (!Array.isArray(store.chats) || store.chats.length === 0) {
-    const chat = makeChat(store.defaults);
-    store.chats = [chat];
-    store.activeChatId = chat.id;
-  }
+  if (!Array.isArray(store.chats)) store.chats = [];
   if (!store.chats.find((c) => c.id === store.activeChatId)) {
-    store.activeChatId = store.chats[0].id;
+    store.activeChatId = store.chats[0]?.id || null;
   }
   for (const c of store.chats) {
     if (typeof c.safetyIdentifierEnabled !== "boolean") {
@@ -224,14 +219,10 @@ export function useStore() {
 
   const deleteChat = useCallback((id) => {
     setStore((s) => {
-      let chats = s.chats.filter((c) => c.id !== id);
+      const chats = s.chats.filter((c) => c.id !== id);
       let activeChatId = s.activeChatId;
-      if (chats.length === 0) {
-        const chat = makeChat({ ...s.defaults, keyId: s.apiKeys[0]?.id || null });
-        chats = [chat];
-        activeChatId = chat.id;
-      } else if (id === s.activeChatId) {
-        activeChatId = chats[0].id;
+      if (id === s.activeChatId) {
+        activeChatId = chats[0]?.id || null;
       }
       return { ...s, chats, activeChatId };
     });

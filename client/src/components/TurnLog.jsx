@@ -74,10 +74,10 @@ export default function TurnLog({ width, turns, safetyIdentifierEnabled, safetyI
         <button
           onClick={onExport}
           disabled={turns.length === 0}
-          title="Download turn log as .txt"
+          title="Download turn log as .csv"
           className="ml-auto flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-xs font-normal hover:bg-white/5 disabled:opacity-40"
         >
-          <Download size={12} /> .txt
+          <Download size={12} /> .csv
         </button>
         <span className="text-xs font-normal text-zinc-500">{turns.length}</span>
       </div>

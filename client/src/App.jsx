@@ -54,6 +54,85 @@ async function fileToAttachment(file) {
   return { ...base, kind: "text", text };
 }
 
+const csvHeaders = [
+  "turn_number",
+  "time",
+  "chat_title",
+  "key",
+  "model",
+  "safety_identifier",
+  "api_call_count",
+  "request_ids",
+  "response_ids",
+  "statuses",
+  "errors",
+  "input_tokens",
+  "output_tokens",
+  "request",
+  "response",
+  "attachments",
+  "tool_activity",
+];
+
+const csvCell = (value) => {
+  const text = String(value ?? "");
+  const safe = /^[=+\-@]/.test(text.trimStart()) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+};
+
+const csvLine = (values) => values.map(csvCell).join(",");
+
+const attachmentPlaceholder = (attachment) =>
+  `[attachment:${attachment?.kind || "file"}:${attachment?.name || "unnamed"}]`;
+
+const toolPlaceholder = (tool) => {
+  const status = tool.status ? ` (${tool.status})` : "";
+  if (tool.name === "read_file") return `read_file [local file omitted]${status}`;
+  if (tool.name === "write_file") {
+    return `write_file [local file omitted] [content omitted]${status}`;
+  }
+  if (tool.name === "list_dir") return `list_dir [local directory omitted]${status}`;
+  if (tool.name === "run_command") return `run_command [command omitted]${status}`;
+  return `${tool.name || "tool"} [details omitted]${status}`;
+};
+
+function buildTurnTranscripts(messages, turns) {
+  const segments = [];
+  let current = null;
+
+  for (const message of messages) {
+    if (message.role === "user") {
+      current = { user: message, assistant: [], tools: [], notices: [] };
+      segments.push(current);
+    } else if (current && message.role === "assistant") {
+      current.assistant.push(message);
+    } else if (current && message.type === "tool") {
+      current.tools.push(message);
+    } else if (current && message.type === "notice") {
+      current.notices.push(message);
+    }
+  }
+
+  return turns.map((turn, index) => {
+    const segment = segments.find((s) => s.user?.id === turn.userMessageId) || segments[index] || {};
+    const userMessage = segment.user || null;
+    const attachments = userMessage?.attachments || [];
+    const attachmentText = attachments.map(attachmentPlaceholder).join("\n");
+    const request = [userMessage?.text || "", attachmentText].filter(Boolean).join("\n");
+    const assistantText = (segment.assistant || []).map((m) => m.text || "").filter(Boolean).join("\n\n");
+    const noticeText = (segment.notices || []).map((m) => `[notice: ${m.text}]`).join("\n");
+    const errorText = (turn.calls || []).map((c) => c.error).filter(Boolean).map((e) => `[error: ${e}]`).join("\n");
+    const response = assistantText || noticeText || errorText || "";
+
+    return {
+      request,
+      response,
+      attachments: attachmentText,
+      toolActivity: (segment.tools || []).map(toolPlaceholder).join("\n"),
+    };
+  });
+}
+
 const PANEL_DEFAULT = 320;
 const PANEL_MIN = 220;
 const PANEL_MAX = 560;
@@ -159,7 +238,7 @@ export default function App() {
 
   // Pre-fill the workspace folder from the server default for the first chat.
   useEffect(() => {
-    if (activeChat?.workspaceRoot?.trim()) return;
+    if (!activeChat || activeChat.workspaceRoot?.trim()) return;
     fetch("/api/default-workspace")
       .then((r) => r.json())
       .then((d) => {
@@ -219,6 +298,10 @@ export default function App() {
   const send = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || busy) return;
+    if (!chat) {
+      setError("Create a chat before sending a prompt.");
+      return;
+    }
     if (!activeKey) {
       setError("Choose an API key for this chat in the sidebar first.");
       return;
@@ -233,6 +316,7 @@ export default function App() {
     const sentAttachments = attachments;
     const safetyId = chat.safetyIdentifierEnabled ? chat.safetyIdentifier || null : null;
     const turnId = nextId("turn");
+    const userMessageId = nextId("msg");
 
     setError(null);
     setInput("");
@@ -247,7 +331,7 @@ export default function App() {
       messages: [
         ...c.messages,
         {
-          id: nextId("msg"),
+          id: userMessageId,
           role: "user",
           text,
           attachments: sentAttachments.map((a) => ({ name: a.name, kind: a.kind })),
@@ -257,6 +341,7 @@ export default function App() {
         ...c.turns,
         {
           id: turnId,
+          userMessageId,
           time: new Date().toLocaleTimeString(),
           keyLabel: activeKey.label,
           model: chat.model,
@@ -424,7 +509,7 @@ export default function App() {
   const stamp = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 
   const exportChat = () => {
-    if (messages.length === 0) return;
+    if (!chat || messages.length === 0) return;
     const lines = [
       `# ${chat.title}`,
       `_Exported ${new Date().toLocaleString()} · model: ${chat.model}_`,
@@ -453,41 +538,39 @@ export default function App() {
   };
 
   const exportTurnLog = () => {
-    if (turns.length === 0) return;
-    const lines = [
-      "Codex Local Assistant — Turn Log",
-      `Chat: ${chat.title}`,
-      `Safety Identifier: ${
-        chat.safetyIdentifierEnabled ? chat.safetyIdentifier || "(enabled, not set)" : "(disabled)"
-      }`,
-      `Exported: ${new Date().toLocaleString()}`,
-      "=".repeat(48),
-      "",
-    ];
-    turns.forEach((t, i) => {
-      lines.push(`Turn ${i + 1} — ${t.time}`);
-      lines.push(
-        `  Key: ${t.keyLabel} | Model: ${t.model} | Safety ID: ${t.safetyIdentifier || "(not sent)"}`
-      );
-      if (t.calls.length === 0) lines.push("  (no API calls recorded)");
-      t.calls.forEach((c, ci) => {
-        lines.push(`  API call ${ci + 1}:`);
-        lines.push(`    request_id:  ${c.request_id || "n/a"}`);
-        lines.push(`    response_id: ${c.response_id || "n/a"}`);
-        if (c.status) lines.push(`    status:      ${c.status}`);
-        if (c.error) lines.push(`    error:       ${c.error}`);
-        if (c.usage) {
-          lines.push(
-            `    tokens:      in ${c.usage.input_tokens ?? "?"} / out ${c.usage.output_tokens ?? "?"}`
-          );
-        }
-      });
-      lines.push("");
+    if (!chat || turns.length === 0) return;
+    const transcripts = buildTurnTranscripts(messages, turns);
+    const rows = turns.map((turn, i) => {
+      const calls = Array.isArray(turn.calls) ? turn.calls : [];
+      const inputTokens = calls.reduce((sum, c) => sum + (Number(c.usage?.input_tokens) || 0), 0);
+      const outputTokens = calls.reduce((sum, c) => sum + (Number(c.usage?.output_tokens) || 0), 0);
+      const transcript = transcripts[i] || {};
+
+      return [
+        i + 1,
+        turn.time || "",
+        chat.title || "",
+        turn.keyLabel || "",
+        turn.model || "",
+        turn.safetyIdentifier || "",
+        calls.length,
+        calls.map((c) => c.request_id).filter(Boolean).join("\n"),
+        calls.map((c) => c.response_id).filter(Boolean).join("\n"),
+        calls.map((c) => c.status).filter(Boolean).join("\n"),
+        calls.map((c) => c.error).filter(Boolean).join("\n"),
+        inputTokens || "",
+        outputTokens || "",
+        transcript.request || "",
+        transcript.response || "",
+        transcript.attachments || "",
+        transcript.toolActivity || "",
+      ];
     });
-    download(`turn-log-${stamp()}.txt`, lines.join("\n"), "text/plain");
+    const csv = "\ufeff" + [csvLine(csvHeaders), ...rows.map(csvLine)].join("\r\n");
+    download(`turn-log-${stamp()}.csv`, csv, "text/csv;charset=utf-8");
   };
 
-  const canChat = activeKey && chat?.workspaceValidated;
+  const canChat = Boolean(activeKey && chat?.workspaceValidated);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -509,9 +592,9 @@ export default function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-white/10 px-5 py-3">
           <div className="min-w-0">
-            <div className="truncate font-semibold">{chat?.title || "Chat"}</div>
+            <div className="truncate font-semibold">{chat?.title || "No chat selected"}</div>
             <div className="text-xs text-zinc-500">
-              {activeKey ? activeKey.label : "no key selected"} · {chat?.model}
+              {chat ? `${activeKey ? activeKey.label : "no key selected"} · ${chat.model}` : "create a chat to begin"}
             </div>
           </div>
           <button
@@ -532,7 +615,20 @@ export default function App() {
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6">
           <div className="mx-auto max-w-3xl space-y-5">
-            {messages.length === 0 && (
+            {!chat && (
+              <div className="mt-20 text-center text-zinc-500">
+                <Bot size={32} className="mx-auto mb-3 text-zinc-600" />
+                <p className="text-lg font-medium text-zinc-300">No chats yet</p>
+                <button
+                  onClick={() => setShowNewChat(true)}
+                  className="mx-auto mt-4 flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-500"
+                >
+                  <Plus size={14} /> Create chat
+                </button>
+              </div>
+            )}
+
+            {chat && messages.length === 0 && (
               <div className="mt-20 text-center text-zinc-500">
                 <Bot size={32} className="mx-auto mb-3 text-zinc-600" />
                 <p className="text-lg font-medium text-zinc-300">Start vibe coding</p>
@@ -615,7 +711,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Composer */}
+        {chat && (
         <div className="border-t border-white/10 px-5 py-4">
           <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/[0.03] p-2 focus-within:border-sky-500/50">
             {attachments.length > 0 && (
@@ -698,6 +794,7 @@ export default function App() {
             {busy ? "Running — click the red stop button to force exit" : "Enter to send · Shift+Enter for newline"}
           </p>
         </div>
+        )}
       </main>
 
       <ResizeHandle width={rightWidth} setWidth={setRightWidth} dir={-1} />

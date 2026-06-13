@@ -148,75 +148,83 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* SESSION CONTROLS divider — live toggles for the active chat */}
-      <div className="space-y-1 pt-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            Session controls
-          </span>
-          <div className="h-px flex-1 bg-white/10" />
-        </div>
-        <p className="text-[11px] text-zinc-600">
-          Live toggles for the current chat. Key, model, workspace, and optional safety ID are set
-          when you create it.
-        </p>
-      </div>
+      {settings ? (
+        <>
+          {/* SESSION CONTROLS divider — live toggles for the active chat */}
+          <div className="space-y-1 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                Session controls
+              </span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+            <p className="text-[11px] text-zinc-600">
+              Live toggles for the current chat. Key, model, workspace, and optional safety ID are
+              set when you create it.
+            </p>
+          </div>
 
-      {/* OUTSIDE WORKSPACE ACCESS */}
-      <Section title="Outside Workspace" icon={Globe}>
-        <label className="flex items-center justify-between rounded-lg border border-white/10 px-2.5 py-2">
-          <span className="text-sm">Allow access outside</span>
-          <button
-            onClick={() => update({ allowOutsideWorkspace: !settings.allowOutsideWorkspace })}
-            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-              settings.allowOutsideWorkspace ? "bg-sky-500" : "bg-zinc-700"
-            }`}
-          >
-            <span
-              className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-                settings.allowOutsideWorkspace ? "translate-x-4" : "translate-x-0"
-              }`}
-            />
-          </button>
-        </label>
-        <p className="text-[11px] text-zinc-500">
-          {settings.allowOutsideWorkspace
-            ? "The agent may read, write, and run commands outside the workspace — but every outside action needs your approval, even in Auto-run."
-            : "The agent is confined to the workspace folder. Reads, writes, and commands that reach outside are blocked."}
-        </p>
-      </Section>
+          {/* OUTSIDE WORKSPACE ACCESS */}
+          <Section title="Outside Workspace" icon={Globe}>
+            <label className="flex items-center justify-between rounded-lg border border-white/10 px-2.5 py-2">
+              <span className="text-sm">Allow access outside</span>
+              <button
+                onClick={() => update({ allowOutsideWorkspace: !settings.allowOutsideWorkspace })}
+                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                  settings.allowOutsideWorkspace ? "bg-sky-500" : "bg-zinc-700"
+                }`}
+              >
+                <span
+                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                    settings.allowOutsideWorkspace ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </label>
+            <p className="text-[11px] text-zinc-500">
+              {settings.allowOutsideWorkspace
+                ? "The agent may read, write, and run commands outside the workspace — but every outside action needs your approval, even in Auto-run."
+                : "The agent is confined to the workspace folder. Reads, writes, and commands that reach outside are blocked."}
+            </p>
+          </Section>
 
-      {/* APPROVAL MODE */}
-      <Section title="Command Approval" icon={Hand}>
-        <div className="grid grid-cols-2 gap-1.5">
-          {[
-            { id: "manual", label: "Ask first", icon: Hand },
-            { id: "auto", label: "Auto-run", icon: Zap },
-          ].map((m) => (
-            <button
-              key={m.id}
-              onClick={() => update({ approvalMode: m.id })}
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm ${
-                settings.approvalMode === m.id
-                  ? "border-sky-500/60 bg-sky-500/10"
-                  : "border-white/10 hover:border-white/20"
-              }`}
-            >
-              <m.icon size={14} /> {m.label}
-            </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-zinc-500">
-          {settings.approvalMode === "manual"
-            ? "File edits run automatically; you approve each command."
-            : "Commands run without prompting. Use with care."}
-        </p>
-      </Section>
+          {/* APPROVAL MODE */}
+          <Section title="Command Approval" icon={Hand}>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { id: "manual", label: "Ask first", icon: Hand },
+                { id: "auto", label: "Auto-run", icon: Zap },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => update({ approvalMode: m.id })}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm ${
+                    settings.approvalMode === m.id
+                      ? "border-sky-500/60 bg-sky-500/10"
+                      : "border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <m.icon size={14} /> {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              {settings.approvalMode === "manual"
+                ? "File edits run automatically; you approve each command."
+                : "Commands run without prompting. Use with care."}
+            </p>
+          </Section>
 
-      {!activeKey && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-300">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          This chat has no key. Start a new chat to add and pick one.
+          {!activeKey && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-300">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              This chat has no key. Start a new chat to add and pick one.
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-zinc-500">
+          No chats yet.
         </div>
       )}
     </aside>
