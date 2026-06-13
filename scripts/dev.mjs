@@ -38,7 +38,8 @@ function runChecked(command, args) {
 function ensureDependencies() {
   if (hasInstalledDependencies()) return;
 
-  const installArgs = existsSync(path.join(root, "package-lock.json"))
+  const hasNodeModules = existsSync(path.join(root, "node_modules"));
+  const installArgs = existsSync(path.join(root, "package-lock.json")) && !hasNodeModules
     ? ["ci"]
     : ["install"];
 

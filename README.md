@@ -12,51 +12,9 @@ Install these before running the app:
 
 You do not need to install anything separately inside `client` or `server`. Run every command below from the main project folder, the one that contains this README.
 
-## First-Time Setup
+## Start The App
 
-Pick the command for your computer.
-
-### macOS, Linux, WSL, or Git Bash
-
-```bash
-bash setup.sh
-```
-
-### Windows PowerShell
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
-```
-
-### Windows Command Prompt
-
-```bat
-setup.bat
-```
-
-The setup script checks for Node.js, installs all project dependencies from `package-lock.json`, and then tells you when the app is ready to run.
-
-## Run The App
-
-After setup finishes, start the local development servers:
-
-```bash
-npm run dev
-```
-
-If someone skips setup and runs `npm run dev` first, the app will install missing dependencies automatically before starting.
-
-Then open:
-
-```text
-http://localhost:5173
-```
-
-The web app runs on `http://localhost:5173`, and the API server runs on `http://localhost:8787`.
-
-## Easier Start Commands
-
-These commands install dependencies if they are missing, then start the app.
+Pick the one command for your computer. The start command checks for Node.js, installs missing dependencies, and launches the local app.
 
 ### macOS, Linux, WSL, or Git Bash
 
@@ -70,11 +28,21 @@ bash start.sh
 powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
-### Windows Command Prompt
+Then open:
 
-```bat
-start.bat
+```text
+http://localhost:5173
 ```
+
+The web app runs on `http://localhost:5173`, and the API server runs on `http://localhost:8787`.
+
+You can also run the app directly with npm:
+
+```bash
+npm run dev
+```
+
+If dependencies are missing, `npm run dev` installs them automatically before starting.
 
 ## Clean Reinstall
 
@@ -92,12 +60,6 @@ bash start.sh --clean
 powershell -ExecutionPolicy Bypass -File .\start.ps1 -Clean
 ```
 
-### Windows Command Prompt
-
-```bat
-start.bat -Clean
-```
-
 ## Using The App
 
 1. Open `http://localhost:5173`.
@@ -107,6 +69,6 @@ start.bat -Clean
 
 ## Troubleshooting
 
-- If setup says Node.js is missing or too old, install the current LTS version from https://nodejs.org and run setup again.
+- If startup says Node.js is missing or too old, install the current LTS version from https://nodejs.org and run the start command again.
 - If `npm run dev` says a port is already in use, close the old terminal running the app and try again.
 - If dependencies fail after an update, run the clean reinstall command for your computer.
