@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useLayoutEffect } from "react";
 import {
   SendHorizontal,
   Plus,
@@ -136,6 +136,7 @@ function buildTurnTranscripts(messages, turns) {
 const PANEL_DEFAULT = 320;
 const PANEL_MIN = 220;
 const PANEL_MAX = 560;
+const COMPOSER_MAX_HEIGHT = 160;
 
 const loadWidth = (key) => {
   const v = Number(localStorage.getItem(`cla.panel.${key}`));
@@ -213,6 +214,7 @@ export default function App() {
 
   const [attachments, setAttachments] = useState([]);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const streamChatId = useRef(null); // chat the in-flight stream writes to
   const scrollRef = useRef(null);
@@ -221,6 +223,16 @@ export default function App() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status]);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    const height = Math.min(textarea.scrollHeight, COMPOSER_MAX_HEIGHT);
+    textarea.style.height = `${height}px`;
+    textarea.style.overflowY = textarea.scrollHeight > COMPOSER_MAX_HEIGHT ? "auto" : "hidden";
+  }, [input]);
 
   useEffect(() => {
     localStorage.setItem("cla.panel.left", String(leftWidth));
@@ -756,6 +768,7 @@ export default function App() {
                 <Plus size={18} />
               </button>
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
@@ -769,7 +782,7 @@ export default function App() {
                     : "Ask me to build something…"
                 }
                 disabled={!canChat}
-                className="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-zinc-600 disabled:opacity-50"
+                className="max-h-40 min-h-8 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm leading-5 outline-none placeholder:text-zinc-600 disabled:opacity-50"
               />
               {busy ? (
                 <button
