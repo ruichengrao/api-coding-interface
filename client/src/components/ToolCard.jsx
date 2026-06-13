@@ -9,6 +9,7 @@ import {
   X,
   Loader2,
   Globe,
+  Copy,
 } from "lucide-react";
 
 const ICONS = {
@@ -29,6 +30,41 @@ function summarize(name, args) {
   if (name === "run_command") return args.command;
   if (name === "write_file") return args.path;
   return args.path;
+}
+
+function DetailBlock({ label, value, mono = true }) {
+  const [copied, setCopied] = useState(false);
+  if (value == null || value === "") return null;
+
+  const copy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(String(value));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0d1117]">
+      <div className="flex items-center gap-2 border-b border-white/10 px-2 py-1.5 text-[10px] uppercase tracking-wide text-zinc-500">
+        <span>{label}</span>
+        <button
+          onClick={copy}
+          className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 normal-case tracking-normal text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          title={`Copy ${label}`}
+        >
+          {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre
+        className={`max-h-60 overflow-auto p-2 text-xs whitespace-pre-wrap break-words ${
+          mono ? "font-mono" : "font-sans"
+        }`}
+      >
+        {value}
+      </pre>
+    </div>
+  );
 }
 
 export default function ToolCard({ tool, onApprove, onReject }) {
@@ -56,7 +92,9 @@ export default function ToolCard({ tool, onApprove, onReject }) {
         />
         <Icon size={15} className="shrink-0 text-zinc-400" />
         <span className="font-medium text-zinc-300">{LABELS[tool.name] || tool.name}</span>
-        <code className="truncate text-zinc-500 text-xs">{summarize(tool.name, tool.arguments)}</code>
+        <code className="truncate text-zinc-500 text-xs" title={summarize(tool.name, tool.arguments)}>
+          {summarize(tool.name, tool.arguments)}
+        </code>
         {tool.outside && (
           <span
             title="Reaches outside the workspace folder"
@@ -75,15 +113,14 @@ export default function ToolCard({ tool, onApprove, onReject }) {
 
       {open && (
         <div className="px-3 pb-3 space-y-2">
+          {tool.name === "run_command" && (
+            <DetailBlock label="command" value={tool.arguments?.command} />
+          )}
           {tool.name === "write_file" && tool.arguments?.content != null && (
-            <pre className="max-h-60 overflow-auto rounded-lg bg-[#0d1117] border border-white/10 p-2 text-xs">
-              {tool.arguments.content}
-            </pre>
+            <DetailBlock label="content" value={tool.arguments.content} />
           )}
           {tool.result != null && (
-            <pre className="max-h-60 overflow-auto rounded-lg bg-[#0d1117] border border-white/10 p-2 text-xs whitespace-pre-wrap">
-              {tool.result}
-            </pre>
+            <DetailBlock label="result" value={tool.result} />
           )}
         </div>
       )}

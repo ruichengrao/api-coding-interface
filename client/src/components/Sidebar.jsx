@@ -167,7 +167,7 @@ export default function Sidebar({
           {/* OUTSIDE WORKSPACE ACCESS */}
           <Section title="Outside Workspace" icon={Globe}>
             <label className="flex items-center justify-between rounded-lg border border-white/10 px-2.5 py-2">
-              <span className="text-sm">Allow access outside</span>
+              <span className="text-sm">Allow parent/outside paths</span>
               <button
                 onClick={() => update({ allowOutsideWorkspace: !settings.allowOutsideWorkspace })}
                 className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
@@ -183,8 +183,8 @@ export default function Sidebar({
             </label>
             <p className="text-[11px] text-zinc-500">
               {settings.allowOutsideWorkspace
-                ? "The agent may read, write, and run commands outside the workspace — but every outside action needs your approval, even in Auto-run."
-                : "The agent is confined to the workspace folder. Reads, writes, and commands that reach outside are blocked."}
+                ? "Child folders are always allowed. Parent or outside paths can run only after your approval, even in Auto-run."
+                : "Child folders are allowed by default. Parent or outside paths are blocked."}
             </p>
           </Section>
 

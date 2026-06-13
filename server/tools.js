@@ -24,7 +24,7 @@ export const toolDefinitions = [
       properties: {
         path: {
           type: "string",
-          description: "File path relative to the workspace root.",
+          description: "File path relative to the workspace root. A leading slash is treated as workspace-root-relative, so /public means the workspace's public folder.",
         },
       },
       required: ["path"],
@@ -41,7 +41,7 @@ export const toolDefinitions = [
       properties: {
         path: {
           type: "string",
-          description: "File path relative to the workspace root.",
+          description: "File path relative to the workspace root. A leading slash is treated as workspace-root-relative, so /public means the workspace's public folder.",
         },
         content: {
           type: "string",
@@ -62,7 +62,7 @@ export const toolDefinitions = [
         path: {
           type: "string",
           description:
-            "Directory path relative to the workspace root. Use '.' for the root.",
+            "Directory path relative to the workspace root. Use '.' for the root. A leading slash is treated as workspace-root-relative.",
         },
       },
       required: ["path"],
@@ -73,7 +73,7 @@ export const toolDefinitions = [
     type: "function",
     name: "run_command",
     description:
-      "Run a shell command from the workspace root and return its stdout/stderr. Use for builds, tests, installs, git, etc.",
+      "Run a shell command from the workspace root and return its stdout/stderr. Use relative paths such as public/file.js for workspace children; shell paths starting with / are OS-absolute paths.",
     parameters: {
       type: "object",
       properties: {
@@ -109,11 +109,34 @@ function isOutside(root, resolved) {
   return x !== r && !x.startsWith(r + path.sep);
 }
 
+function firstSegment(p) {
+  return p.split(/[\\/]+/).filter(Boolean)[0] || "";
+}
+
+function resolveWorkspacePath(root, input) {
+  const raw = String(input || ".");
+  if (/^[A-Za-z]:[\\/]/.test(raw) || raw.startsWith("\\\\")) return path.resolve(raw);
+  if (!path.isAbsolute(raw)) return path.resolve(root, raw);
+
+  const absolute = path.resolve(raw);
+  if (!isOutside(root, absolute)) return absolute;
+
+  // Models often use web-style root-relative paths such as /public or /src.
+  // Treat those as workspace children. Full absolute paths that share the
+  // workspace's top-level segment still behave as absolute paths, so parent
+  // access like /Users/me remains outside.
+  if (firstSegment(raw) !== firstSegment(root)) {
+    return path.resolve(root, raw.replace(/^[/\\]+/, "") || ".");
+  }
+
+  return absolute;
+}
+
 // Resolve a path relative to the workspace. When the resolved path escapes the
 // workspace and outside access is not allowed, throw.
 function resolvePath(workspaceRoot, relPath, allowOutside) {
   const root = path.resolve(workspaceRoot);
-  const resolved = path.resolve(root, relPath || ".");
+  const resolved = resolveWorkspacePath(root, relPath);
   if (isOutside(root, resolved) && !allowOutside) {
     throw new Error(
       `Path "${relPath}" is outside the workspace. Enable "Outside workspace access" in Settings to allow this.`
@@ -163,7 +186,7 @@ function commandLooksOutside(command, root) {
 export function accessesOutside(name, args, workspaceRoot) {
   const root = path.resolve(workspaceRoot || ".");
   if (name === "read_file" || name === "write_file" || name === "list_dir") {
-    return isOutside(root, path.resolve(root, args.path || "."));
+    return isOutside(root, resolveWorkspacePath(root, args.path));
   }
   if (name === "run_command") {
     return commandLooksOutside(args.command || "", root);
@@ -204,7 +227,7 @@ export async function executeTool(name, args, workspaceRoot, allowOutside = fals
 
     case "run_command": {
       if (!allowOutside && commandLooksOutside(args.command || "", path.resolve(workspaceRoot))) {
-        return `Blocked: this command appears to access paths outside the workspace, which is disabled. Enable "Outside workspace access" in Settings to allow it.`;
+        return `Blocked: this command appears to access paths outside the workspace, which is disabled. Use relative paths like public/... for workspace child folders, or enable "Outside workspace access" in Settings for parent/outside paths.`;
       }
       try {
         const { stdout, stderr } = await execAsync(args.command, {
