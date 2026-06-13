@@ -14,7 +14,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { validateWorkspace, browseFolder } from "../lib/agentClient";
+import { validateWorkspace, browseFolder, inspectApiKey } from "../lib/agentClient";
 import { randomHex } from "../lib/useSettings";
 
 // Guided setup shown each time the user starts a new chat: manage/pick a key,
@@ -25,6 +25,7 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [validated, setValidated] = useState(false);
   const [wsStatus, setWsStatus] = useState(null);
+  const [keyStatus, setKeyStatus] = useState(null);
   const [safetyIdentifierEnabled, setSafetyIdentifierEnabled] = useState(false);
   const [safetyIdentifier, setSafetyIdentifier] = useState("");
   const [newLabel, setNewLabel] = useState("");
@@ -40,6 +41,7 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
     setWorkspaceRoot(defaults?.workspaceRoot || "");
     setValidated(false);
     setWsStatus(null);
+    setKeyStatus(null);
     setSafetyIdentifierEnabled(false);
     setSafetyIdentifier("");
     setNewLabel("");
@@ -88,12 +90,14 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
     if (!newKey.trim()) return;
     const id = addKey(newLabel.trim(), newKey.trim());
     setKeyId(id); // select the key we just added
+    setKeyStatus(null);
     setNewLabel("");
     setNewKey("");
   };
 
   const removeOneKey = (id) => {
     removeKey(id);
+    setKeyStatus(null);
     if (keyId === id) setKeyId(apiKeys.find((k) => k.id !== id)?.id ?? null);
   };
 
@@ -107,17 +111,34 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
 
   const canCreate = validated && !!keyId;
 
-  const create = () => {
+  const create = async () => {
     if (!canCreate) return;
+    const selectedKey = apiKeys.find((k) => k.id === keyId);
+    if (!selectedKey) {
+      setKeyStatus({ ok: false, error: "Choose an API key before creating a chat." });
+      return;
+    }
+
+    setKeyStatus({ checking: true });
+    let apiIdentity;
+    try {
+      apiIdentity = await inspectApiKey(selectedKey.key);
+    } catch (e) {
+      setKeyStatus({ ok: false, error: e.message });
+      return;
+    }
+
     const nextSafetyIdentifier = safetyIdentifierEnabled ? safetyIdentifier || randomHex() : "";
     onCreate({
       keyId,
       model,
       workspaceRoot,
       workspaceValidated: true,
+      apiIdentity: { ...apiIdentity, keyId: selectedKey.id, keyLabel: selectedKey.label },
       safetyIdentifierEnabled,
       safetyIdentifier: nextSafetyIdentifier,
     });
+    setKeyStatus(null);
   };
 
   return (
@@ -160,7 +181,10 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
                         name="newChatKey"
                         className="accent-sky-500"
                         checked={keyId === k.id}
-                        onChange={() => setKeyId(k.id)}
+                        onChange={() => {
+                          setKeyId(k.id);
+                          setKeyStatus(null);
+                        }}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{k.label}</div>
@@ -206,6 +230,10 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
                 </button>
               </div>
             </div>
+            {keyStatus?.checking && <p className="text-xs text-zinc-500">Checking API key…</p>}
+            {keyStatus && keyStatus.ok === false && (
+              <p className="text-xs text-rose-400">{keyStatus.error}</p>
+            )}
           </div>
 
           {/* Model */}
@@ -321,10 +349,10 @@ export default function NewChatModal({ open, onClose, onCreate, apiKeys, addKey,
           </button>
           <button
             onClick={create}
-            disabled={!canCreate}
+            disabled={!canCreate || keyStatus?.checking}
             className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-sky-500 disabled:opacity-40"
           >
-            <MessageSquarePlus size={15} /> Create chat
+            <MessageSquarePlus size={15} /> {keyStatus?.checking ? "Checking…" : "Create chat"}
           </button>
         </div>
       </div>

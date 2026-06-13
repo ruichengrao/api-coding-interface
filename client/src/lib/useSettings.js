@@ -38,6 +38,7 @@ function makeChat(seed = {}) {
     previousResponseId: null,
     messages: [],
     turns: [],
+    apiIdentity: seed.apiIdentity || null,
     ...SETTING_DEFAULTS,
     // only copy known setting fields from the seed
     ...Object.fromEntries(SETTING_KEYS.filter((k) => k in seed).map((k) => [k, seed[k]])),
@@ -125,6 +126,7 @@ function normalize(store) {
       c.safetyIdentifierEnabled = Boolean(c.safetyIdentifier);
     }
     if (c.safetyIdentifierEnabled && !c.safetyIdentifier) c.safetyIdentifier = randomHex();
+    c.apiIdentity = c.apiIdentity || null;
     c.messages = ensureUniqueIds(c.messages, "msg");
     c.turns = dedupeTurnCalls(ensureUniqueIds(c.turns, "turn"));
   }
@@ -198,6 +200,7 @@ export function useStore() {
         ...Object.fromEntries(SETTING_KEYS.map((k) => [k, base[k]])),
         ...Object.fromEntries(SETTING_KEYS.filter((k) => k in seed).map((k) => [k, seed[k]])),
       };
+      if (seed.apiIdentity) merged.apiIdentity = seed.apiIdentity;
       if (!merged.keyId) merged.keyId = s.apiKeys[0]?.id || null;
       const chat = makeChat(merged);
       return { ...s, chats: [chat, ...s.chats], activeChatId: chat.id };

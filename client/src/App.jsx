@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "./lib/useSettings";
-import { streamChat, approveToolCall } from "./lib/agentClient";
+import { streamChat, approveToolCall, inspectApiKey } from "./lib/agentClient";
 import Sidebar from "./components/Sidebar";
 import TurnLog from "./components/TurnLog";
 import ToolCard from "./components/ToolCard";
@@ -60,6 +60,8 @@ const csvHeaders = [
   "chat_title",
   "key",
   "model",
+  "api_email",
+  "api_organization_id",
   "safety_identifier",
   "api_call_count",
   "request_ids",
@@ -219,6 +221,7 @@ export default function App() {
   const streamChatId = useRef(null); // chat the in-flight stream writes to
   const scrollRef = useRef(null);
   const abortRef = useRef(null);
+  const identityCheckRef = useRef(new Set());
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -259,6 +262,34 @@ export default function App() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!chat || !activeKey) return;
+    if (chat.apiIdentity?.keyId === activeKey.id && chat.apiIdentity?.checkedAt) return;
+
+    const cacheKey = `${activeChatId}:${activeKey.id}`;
+    if (identityCheckRef.current.has(cacheKey)) return;
+    identityCheckRef.current.add(cacheKey);
+
+    let canceled = false;
+    inspectApiKey(activeKey.key)
+      .then((identity) => {
+        if (canceled) return;
+        updateChat(activeChatId, {
+          apiIdentity: { ...identity, keyId: activeKey.id, keyLabel: activeKey.label },
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      canceled = true;
+    };
+  }, [
+    activeChatId,
+    activeKey,
+    chat,
+    updateChat,
+  ]);
 
   const patchTool = (chatId, callId, patch) =>
     updateChat(chatId, (c) => ({
@@ -307,6 +338,18 @@ export default function App() {
 
   const removeAttachment = (id) => setAttachments((prev) => prev.filter((a) => a.id !== id));
 
+  const ensureApiIdentity = async (chatId) => {
+    const cached = chat?.apiIdentity;
+    if (cached?.keyId === activeKey?.id && cached.checkedAt) {
+      return cached;
+    }
+
+    const identity = await inspectApiKey(activeKey.key);
+    const apiIdentity = { ...identity, keyId: activeKey.id, keyLabel: activeKey.label };
+    updateChat(chatId, { apiIdentity });
+    return apiIdentity;
+  };
+
   const send = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || busy) return;
@@ -324,16 +367,28 @@ export default function App() {
     }
 
     const chatId = activeChatId;
+    setError(null);
+    setBusy(true);
+    setStatus("Checking API key…");
+
+    let apiIdentity;
+    try {
+      apiIdentity = await ensureApiIdentity(chatId);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+      setStatus("");
+      return;
+    }
+
     streamChatId.current = chatId;
     const sentAttachments = attachments;
     const safetyId = chat.safetyIdentifierEnabled ? chat.safetyIdentifier || null : null;
     const turnId = nextId("turn");
     const userMessageId = nextId("msg");
 
-    setError(null);
     setInput("");
     setAttachments([]);
-    setBusy(true);
     setStatus("Thinking…");
 
     // Append the user message + a new turn-log entry; title the chat from the
@@ -356,6 +411,7 @@ export default function App() {
           userMessageId,
           time: new Date().toLocaleTimeString(),
           keyLabel: activeKey.label,
+          apiIdentity,
           model: chat.model,
           safetyIdentifier: safetyId,
           calls: [],
@@ -554,6 +610,7 @@ export default function App() {
     const transcripts = buildTurnTranscripts(messages, turns);
     const rows = turns.map((turn, i) => {
       const calls = Array.isArray(turn.calls) ? turn.calls : [];
+      const apiIdentity = turn.apiIdentity || chat.apiIdentity || {};
       const inputTokens = calls.reduce((sum, c) => sum + (Number(c.usage?.input_tokens) || 0), 0);
       const outputTokens = calls.reduce((sum, c) => sum + (Number(c.usage?.output_tokens) || 0), 0);
       const transcript = transcripts[i] || {};
@@ -564,6 +621,8 @@ export default function App() {
         chat.title || "",
         turn.keyLabel || "",
         turn.model || "",
+        apiIdentity.email || "",
+        apiIdentity.organizationId || "",
         turn.safetyIdentifier || "",
         calls.length,
         calls.map((c) => c.request_id).filter(Boolean).join("\n"),
@@ -814,6 +873,7 @@ export default function App() {
       <TurnLog
         width={rightWidth}
         turns={turns}
+        apiIdentity={chat?.apiIdentity}
         safetyIdentifierEnabled={chat?.safetyIdentifierEnabled}
         safetyIdentifier={chat?.safetyIdentifier}
         onExport={exportTurnLog}

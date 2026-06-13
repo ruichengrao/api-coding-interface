@@ -72,3 +72,16 @@ export async function validateWorkspace(workspaceRoot) {
   });
   return res.json();
 }
+
+export async function inspectApiKey(apiKey) {
+  const res = await fetch("/api/inspect-key", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || `API key check failed (${res.status}).`);
+  }
+  return data.identity;
+}

@@ -7,6 +7,7 @@ import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import { runAgent } from "./agent.js";
+import { inspectApiKey } from "./openai.js";
 
 const execAsync = promisify(exec);
 
@@ -40,6 +41,24 @@ app.post("/api/validate-workspace", async (req, res) => {
     return res.json({ ok: true, resolved: path.resolve(workspaceRoot) });
   } catch (e) {
     return res.json({ ok: false, error: e.message });
+  }
+});
+
+// Validate the selected OpenAI API key and return non-secret account metadata
+// for the turn log.
+app.post("/api/inspect-key", async (req, res) => {
+  const { apiKey } = req.body || {};
+  try {
+    const identity = await inspectApiKey({ apiKey });
+    return res.json({ ok: true, identity });
+  } catch (e) {
+    const status = e.status && e.status !== 0 ? e.status : 502;
+    return res.status(status).json({
+      ok: false,
+      error: e.message,
+      request_id: e.requestId || null,
+      status: e.status || null,
+    });
   }
 });
 
