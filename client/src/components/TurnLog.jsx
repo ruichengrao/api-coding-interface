@@ -29,7 +29,27 @@ function IdRow({ label, value }) {
   );
 }
 
-export default function TurnLog({ width, turns, onExport }) {
+function SafetyIdentifierCard({ value }) {
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-xs">
+      <div className="mb-2 flex items-center gap-1.5 font-semibold text-emerald-300">
+        <ShieldCheck size={13} /> Safety Identifier
+      </div>
+      {value ? (
+        <div className="flex items-center gap-1.5 rounded-lg bg-black/30 p-2">
+          <code className="min-w-0 flex-1 truncate text-zinc-300">{value}</code>
+          <CopyBtn value={value} />
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 rounded-lg bg-black/30 p-2 text-zinc-500">
+          <ShieldOff size={12} /> Not set
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TurnLog({ width, turns, safetyIdentifier, onExport }) {
   return (
     <aside
       style={{ width }}
@@ -49,6 +69,8 @@ export default function TurnLog({ width, turns, onExport }) {
       </div>
 
       <div className="p-3 space-y-3">
+        <SafetyIdentifierCard value={safetyIdentifier} />
+
         {turns.length === 0 && (
           <p className="px-1 text-xs text-zinc-500">
             Request and response IDs for each turn appear here.

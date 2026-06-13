@@ -20,8 +20,7 @@ import ToolCard from "./components/ToolCard";
 import Markdown from "./components/Markdown";
 import NewChatModal from "./components/NewChatModal";
 
-let msgId = 0;
-const nextId = () => `m${++msgId}`;
+const nextId = (prefix = "id") => `${prefix}-${crypto.randomUUID()}`;
 
 const MAX_ATTACH_BYTES = 10 * 1024 * 1024; // 10 MB per file
 const MAX_ATTACH_TEXT = 100_000; // chars of a text file we inline
@@ -137,7 +136,6 @@ export default function App() {
   const fileInputRef = useRef(null);
 
   const streamChatId = useRef(null); // chat the in-flight stream writes to
-  const currentTurnId = useRef(null);
   const scrollRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -234,8 +232,7 @@ export default function App() {
     streamChatId.current = chatId;
     const sentAttachments = attachments;
     const safetyId = chat.safetyIdentifier || null;
-    const turnId = nextId();
-    currentTurnId.current = turnId;
+    const turnId = nextId("turn");
 
     setError(null);
     setInput("");
@@ -250,7 +247,7 @@ export default function App() {
       messages: [
         ...c.messages,
         {
-          id: nextId(),
+          id: nextId("msg"),
           role: "user",
           text,
           attachments: sentAttachments.map((a) => ({ name: a.name, kind: a.kind })),
@@ -296,13 +293,13 @@ export default function App() {
           ids: (d) =>
             updateChat(chatId, (c) => ({
               turns: c.turns.map((t) =>
-                t.id === currentTurnId.current ? { ...t, calls: [...t.calls, d] } : t
+                t.id === turnId ? { ...t, calls: [...t.calls, d] } : t
               ),
             })),
           assistant_message: (d) => {
             setStatus("");
             updateChat(chatId, (c) => ({
-              messages: [...c.messages, { id: nextId(), role: "assistant", text: d.text }],
+              messages: [...c.messages, { id: nextId("msg"), role: "assistant", text: d.text }],
             }));
           },
           tool_call: (d) => {
@@ -311,7 +308,7 @@ export default function App() {
               messages: [
                 ...c.messages,
                 {
-                  id: nextId(),
+                  id: nextId("tool"),
                   type: "tool",
                   call_id: d.call_id,
                   name: d.name,
@@ -347,7 +344,7 @@ export default function App() {
     } catch (e) {
       if (e.name === "AbortError") {
         updateChat(chatId, (c) => ({
-          messages: [...c.messages, { id: nextId(), type: "notice", text: "Stopped by you." }],
+          messages: [...c.messages, { id: nextId("notice"), type: "notice", text: "Stopped by you." }],
         }));
       } else {
         setError(e.message);
@@ -437,6 +434,7 @@ export default function App() {
     const lines = [
       "Codex Local Assistant — Turn Log",
       `Chat: ${chat.title}`,
+      `Safety Identifier: ${chat.safetyIdentifier || "(not set)"}`,
       `Exported: ${new Date().toLocaleString()}`,
       "=".repeat(48),
       "",
@@ -676,7 +674,12 @@ export default function App() {
       </main>
 
       <ResizeHandle width={rightWidth} setWidth={setRightWidth} dir={-1} />
-      <TurnLog width={rightWidth} turns={turns} onExport={exportTurnLog} />
+      <TurnLog
+        width={rightWidth}
+        turns={turns}
+        safetyIdentifier={chat?.safetyIdentifier}
+        onExport={exportTurnLog}
+      />
 
       <NewChatModal
         open={showNewChat}

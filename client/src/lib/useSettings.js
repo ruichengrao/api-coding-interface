@@ -52,6 +52,51 @@ function freshStore() {
   return { version: 2, apiKeys: [], chats: [chat], activeChatId: chat.id, defaults: { ...SETTING_DEFAULTS } };
 }
 
+function makePersistedId(prefix) {
+  return `${prefix}-${randomHex(8)}`;
+}
+
+function ensureUniqueIds(items, prefix) {
+  if (!Array.isArray(items)) return [];
+  const seen = new Set();
+  return items.map((item) => {
+    const next = item && typeof item === "object" ? item : {};
+    if (!next.id || seen.has(next.id)) {
+      const id = makePersistedId(prefix);
+      seen.add(id);
+      return { ...next, id };
+    }
+    seen.add(next.id);
+    return next;
+  });
+}
+
+function callKey(call) {
+  if (call?.request_id) return `request:${call.request_id}`;
+  if (call?.response_id) return `response:${call.response_id}`;
+  return null;
+}
+
+function dedupeTurnCalls(turns) {
+  const lastOccurrence = new Map();
+
+  turns.forEach((turn, turnIndex) => {
+    const calls = Array.isArray(turn.calls) ? turn.calls : [];
+    calls.forEach((call, callIndex) => {
+      const key = callKey(call);
+      if (key) lastOccurrence.set(key, `${turnIndex}:${callIndex}`);
+    });
+  });
+
+  return turns.map((turn, turnIndex) => ({
+    ...turn,
+    calls: (Array.isArray(turn.calls) ? turn.calls : []).filter((call, callIndex) => {
+      const key = callKey(call);
+      return !key || lastOccurrence.get(key) === `${turnIndex}:${callIndex}`;
+    }),
+  }));
+}
+
 // Wrap an existing v1 settings blob into the v2 shape: keep the key pool, fold
 // the old global settings into one starter chat + the defaults for new chats.
 function migrateV1(old) {
@@ -84,6 +129,8 @@ function normalize(store) {
   for (const c of store.chats) {
     if (!c.safetyIdentifier) c.safetyIdentifier = randomHex();
     delete c.safetyIdentifierEnabled;
+    c.messages = ensureUniqueIds(c.messages, "msg");
+    c.turns = dedupeTurnCalls(ensureUniqueIds(c.turns, "turn"));
   }
   store.version = 2;
   return store;
