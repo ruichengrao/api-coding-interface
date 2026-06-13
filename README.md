@@ -1,26 +1,23 @@
 # Codex Local Assistant
 
-A local coding assistant web app with a Node/Express API server and a Vite React client.
+A local web app for chatting with an OpenAI-powered coding assistant.
 
-The app runs entirely on your machine:
+The app runs on your machine:
 
-- Web app: `http://localhost:5173`
+- UI: `http://localhost:5173`
 - API server: `http://localhost:8787`
 
 ## Requirements
 
-Install these first:
+- Node.js 18 or newer: https://nodejs.org
+- Python 3: https://www.python.org
+- An OpenAI API key
 
-- Node.js 18 or newer from https://nodejs.org
-- npm, included with Node.js
-- Python 3, used by the launcher script
-- An OpenAI API key, added inside the app after it opens
+## Start
 
-Run commands from the main project folder, the folder that contains this README.
+Run commands from this project folder.
 
-## Start The App
-
-### macOS, Linux, or Windows WSL
+### macOS or Windows WSL
 
 ```bash
 bash start.sh
@@ -32,58 +29,43 @@ bash start.sh
 python run_api.py
 ```
 
-The launcher installs missing npm dependencies, starts the server and client, and opens the app in your browser.
+The launcher installs dependencies if needed, starts the app, and opens your browser.
 
-If the browser does not open automatically, go to:
+If the browser does not open, go to:
 
 ```text
 http://localhost:5173
 ```
 
+## First Use
+
+1. Create a new chat.
+2. Add your OpenAI API key.
+3. Choose and validate the local project folder the assistant can work in.
+4. Send a message.
+
+## Stop
+
+Press `Ctrl+C` in the terminal.
+
 ## Clean Restart
 
-Use this if dependencies are stale, ports are stuck, or the app is not starting cleanly.
+Use this if ports are stuck or dependencies look broken.
 
-### macOS, Linux, or Windows WSL
+macOS or Windows WSL:
 
 ```bash
 bash start.sh --clean
 ```
 
-### Windows PowerShell
+Windows PowerShell:
 
 ```powershell
 python run_api.py --clean
 ```
 
-The clean restart removes installed dependencies and build output, frees the app ports when possible, reinstalls dependencies, and starts the app again.
+## Common Issues
 
-## Daily Development
-
-After dependencies are installed, you can also start the app directly:
-
-```bash
-npm run dev
-```
-
-This runs both workspaces:
-
-- `server`: Express API on `http://localhost:8787`
-- `client`: Vite React app on `http://localhost:5173`
-
-Press `Ctrl+C` in the terminal to stop the app.
-
-## Using The App
-
-1. Open `http://localhost:5173`.
-2. Add your OpenAI API key in Settings.
-3. Select the local workspace folder you want the assistant to work in.
-4. Start a chat.
-
-## Troubleshooting
-
-- If Node.js or npm is missing, install Node.js 18 or newer from https://nodejs.org.
-- If Python is missing, install Python 3 from https://www.python.org.
-- If `npm run dev` says `concurrently` is not recognized, run the launcher command first so dependencies are installed.
-- If a port is already in use, run the clean restart command for your system.
-- If dependency installation fails, close other terminals running the app and try the clean restart again.
+- `npm` missing: install Node.js, then reopen your terminal.
+- `python` missing: install Python 3, then reopen your terminal.
+- Port already in use: run the clean restart command above.
