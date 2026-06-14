@@ -11,7 +11,7 @@ const OLD_KEY = "codex-local-assistant.settings.v1";
 const SETTING_DEFAULTS = {
   keyId: null, // which pooled API key this chat uses
   model: "gpt-5.5",
-  approvalMode: "manual", // "manual" | "auto"
+  approvalMode: "smart", // "smart" | "manual" | "auto"
   allowOutsideWorkspace: false,
   safetyIdentifierEnabled: false,
   safetyIdentifier: "",
@@ -122,6 +122,9 @@ function normalize(store) {
     store.activeChatId = store.chats[0]?.id || null;
   }
   for (const c of store.chats) {
+    if (!["smart", "manual", "auto"].includes(c.approvalMode)) {
+      c.approvalMode = SETTING_DEFAULTS.approvalMode;
+    }
     if (typeof c.safetyIdentifierEnabled !== "boolean") {
       c.safetyIdentifierEnabled = Boolean(c.safetyIdentifier);
     }

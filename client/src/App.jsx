@@ -90,9 +90,13 @@ const attachmentPlaceholder = (attachment) =>
 const toolPlaceholder = (tool) => {
   const status = tool.status ? ` (${tool.status})` : "";
   if (tool.name === "read_file") return `read_file [local file omitted]${status}`;
+  if (tool.name === "read_many_files") return `read_many_files [local files omitted]${status}`;
+  if (tool.name === "search_files") return `search_files [local search omitted]${status}`;
+  if (tool.name === "file_tree") return `file_tree [local tree omitted]${status}`;
   if (tool.name === "write_file") {
     return `write_file [local file omitted] [content omitted]${status}`;
   }
+  if (tool.name === "edit_file") return `edit_file [local file omitted] [replacements omitted]${status}`;
   if (tool.name === "list_dir") return `list_dir [local directory omitted]${status}`;
   if (tool.name === "run_command") return `run_command [command omitted]${status}`;
   return `${tool.name || "tool"} [details omitted]${status}`;

@@ -36,16 +36,16 @@ function buildUserContent(userMessage, attachments) {
 
 const SYSTEM_PROMPT = `You are a local agentic coding assistant, similar to Cascade, running on the user's machine.
 
-You have tools to read files, write files, list directories, and run shell commands inside the user's workspace folder.
+You have tools to inspect and modify files, search code, list project trees, and run shell commands inside the user's workspace folder.
 
 Guidelines:
 - Be concise and direct. Explain your plan briefly, then act using tools.
-- Prefer reading relevant files before editing so your changes fit the existing code.
-- When creating or changing code, use write_file with the full file contents.
-- Use run_command for installing dependencies, running builds, and running tests.
-- After making changes, verify them when reasonable (e.g. run the relevant test or build).
+- Start by using file_tree/search_files/read_many_files to gather local context. Do not ask the user to paste terminal output or file contents when you can inspect or run the needed command yourself.
+- Prefer edit_file for targeted changes. Use write_file only when creating a new file or replacing most of an existing file.
+- Use run_command for tests, builds, linters, type checks, and local debugging. Prefer short, bounded commands that produce useful logs.
+- After making changes, verify them when reasonable with the most relevant test/build/check.
 - Never invent file contents you have not read. Inspect first.
-- By default you can only read, write, and run commands inside the workspace folder. Paths outside it are blocked unless the user has enabled outside-workspace access, in which case each outside action requires their explicit approval — so prefer staying inside the workspace.
+- Child paths inside the workspace are allowed. Parent or outside paths are blocked unless the user has enabled outside-workspace access, in which case each outside action requires explicit approval.
 - Format responses in Markdown. Use fenced code blocks for code.`;
 
 /**
@@ -141,7 +141,7 @@ export async function runAgent({
       emit("tool_call", { call_id: fc.call_id, name: fc.name, arguments: args, outside });
 
       let approved = true;
-      if (needsApproval({ name: fc.name, approvalMode, outside, allowOutsideWorkspace })) {
+      if (needsApproval({ name: fc.name, args, approvalMode, outside, allowOutsideWorkspace })) {
         approved = await requestApproval({
           call_id: fc.call_id,
           name: fc.name,

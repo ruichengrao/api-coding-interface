@@ -4,6 +4,9 @@ import {
   FilePen,
   FolderTree,
   TerminalSquare,
+  Search,
+  Files,
+  Pencil,
   ChevronRight,
   Check,
   X,
@@ -16,6 +19,10 @@ const ICONS = {
   read_file: FileText,
   write_file: FilePen,
   list_dir: FolderTree,
+  file_tree: FolderTree,
+  search_files: Search,
+  read_many_files: Files,
+  edit_file: Pencil,
   run_command: TerminalSquare,
 };
 
@@ -23,13 +30,20 @@ const LABELS = {
   read_file: "Read file",
   write_file: "Write file",
   list_dir: "List directory",
+  file_tree: "File tree",
+  search_files: "Search files",
+  read_many_files: "Read files",
+  edit_file: "Edit file",
   run_command: "Run command",
 };
 
 function summarize(name, args) {
-  if (name === "run_command") return args.command;
-  if (name === "write_file") return args.path;
-  return args.path;
+  const a = args || {};
+  if (name === "run_command") return a.command;
+  if (name === "search_files") return a.query;
+  if (name === "read_many_files") return Array.isArray(a.paths) ? a.paths.join(", ") : "";
+  if (name === "write_file" || name === "edit_file") return a.path;
+  return a.path;
 }
 
 function DetailBlock({ label, value, mono = true }) {

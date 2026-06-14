@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Zap,
   Hand,
+  Sparkles,
   MessageSquare,
   MessageSquarePlus,
   Pencil,
@@ -190,9 +191,10 @@ export default function Sidebar({
 
           {/* APPROVAL MODE */}
           <Section title="Command Approval" icon={Hand}>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {[
-                { id: "manual", label: "Ask first", icon: Hand },
+                { id: "smart", label: "Smart", icon: Sparkles },
+                { id: "manual", label: "Ask", icon: Hand },
                 { id: "auto", label: "Auto-run", icon: Zap },
               ].map((m) => (
                 <button
@@ -209,9 +211,11 @@ export default function Sidebar({
               ))}
             </div>
             <p className="text-[11px] text-zinc-500">
-              {settings.approvalMode === "manual"
-                ? "File edits run automatically; you approve each command."
-                : "Commands run without prompting. Use with care."}
+              {settings.approvalMode === "smart"
+                ? "Runs normal debugging and verification commands; asks for risky or outside actions."
+                : settings.approvalMode === "manual"
+                ? "File edits run automatically; you approve each shell command."
+                : "Inside-workspace commands run without prompting. Use with care."}
             </p>
           </Section>
 
